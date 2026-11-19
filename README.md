@@ -151,3 +151,6 @@ cliente = ia.cliente(herramienta="deckard", proveedor=args.proveedor, modelo=arg
 texto = cliente.generar("Mejorá esta consigna: …", sistema="Sos docente de Programación 1.")
 ```
 
+## Contacto
+
+Martín René Vilugrón - mrvilugron@unrn.edu.ar - Ingeniería en Computación UNRN Andina
