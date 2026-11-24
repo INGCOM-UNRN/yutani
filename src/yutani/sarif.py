@@ -41,8 +41,11 @@ def _documentos(salida: str) -> Iterator[dict[str, Any]]:
 
 
 def _archivo(ubicacion: dict[str, Any]) -> str | None:
-    uri = ubicacion.get("artifactLocation", {}).get("uri")
-    if not uri:
+    art = ubicacion.get("artifactLocation") or {}
+    if not isinstance(art, dict):
+        return None
+    uri = art.get("uri")
+    if not isinstance(uri, str) or not uri:
         return None
     if uri.startswith("file://"):
         ruta = unquote(uri[len("file://"):])
@@ -53,14 +56,33 @@ def _archivo(ubicacion: dict[str, Any]) -> str | None:
 
 def _posicion(ubicaciones: list[dict[str, Any]]) -> tuple[str | None, int | None, int | None]:
     """(archivo, línea, columna) de la primera ubicación."""
-    fisica = (ubicaciones[0] if ubicaciones else {}).get("physicalLocation", {})
-    region = fisica.get("region", {})
+    primera = (
+        ubicaciones[0]
+        if isinstance(ubicaciones, list) and ubicaciones and isinstance(ubicaciones[0], dict)
+        else {}
+    )
+    fisica = primera.get("physicalLocation") or {}
+    if not isinstance(fisica, dict):
+        fisica = {}
+    region = fisica.get("region") or {}
+    if not isinstance(region, dict):
+        region = {}
     return _archivo(fisica), region.get("startLine"), region.get("startColumn")
 
 
 def _sin_escapes(mensaje: str) -> str:
     """Los mensajes de SARIF admiten marcadores `{0}`, así que las llaves literales van dobles."""
     return mensaje.replace("{{", "{").replace("}}", "}")
+
+
+def _texto_mensaje(mensaje: Any) -> str | None:
+    if not isinstance(mensaje, dict):
+        return None
+    for clave in ("text", "markdown", "id"):
+        valor = mensaje.get(clave)
+        if isinstance(valor, str) and valor:
+            return valor
+    return None
 
 
 def _diagnostico(
@@ -90,26 +112,53 @@ def parsear_sarif_gcc(salida: str) -> list[dict[str, Any]] | None:
     """
     diagnosticos: list[dict[str, Any]] = []
     encontrado = False
-    try:
-        for documento in _documentos(salida):
-            encontrado = True
-            for corrida in documento["runs"]:
-                for resultado in corrida.get("results", []):
-                    diagnosticos.append(
-                        _diagnostico(
-                            resultado.get("ruleId"),
-                            resultado.get("level", "warning"),
-                            resultado["message"]["text"],
-                            resultado.get("locations", []),
-                        )
-                    )
-                    for relacionada in resultado.get("relatedLocations", []):
-                        texto = relacionada.get("message", {}).get("text")
-                        if texto:
-                            diagnosticos.append(_diagnostico(None, "note", texto, [relacionada]))
-    except (AttributeError, KeyError, TypeError):
+    hubo_resultado_descartado = False
+
+    for documento in _documentos(salida):
+        runs = documento.get("runs")
+        if not isinstance(runs, list):
+            continue
+        encontrado = True
+        for corrida in runs:
+            if not isinstance(corrida, dict):
+                continue
+            resultados = corrida.get("results")
+            if resultados is None:
+                continue
+            if not isinstance(resultados, list):
+                hubo_resultado_descartado = True
+                continue
+            for resultado in resultados:
+                if not isinstance(resultado, dict):
+                    hubo_resultado_descartado = True
+                    continue
+                texto_msg = _texto_mensaje(resultado.get("message"))
+                if texto_msg is None:
+                    hubo_resultado_descartado = True
+                    continue
+                regla = resultado.get("ruleId")
+                regla_str = regla if isinstance(regla, str) else None
+                nivel = resultado.get("level")
+                nivel_str = nivel if isinstance(nivel, str) else "warning"
+                ubicaciones = resultado.get("locations")
+                if not isinstance(ubicaciones, list):
+                    ubicaciones = []
+                diagnosticos.append(_diagnostico(regla_str, nivel_str, texto_msg, ubicaciones))
+
+                relacionadas = resultado.get("relatedLocations") or []
+                if isinstance(relacionadas, list):
+                    for relacionada in relacionadas:
+                        if not isinstance(relacionada, dict):
+                            continue
+                        texto_rel = _texto_mensaje(relacionada.get("message"))
+                        if texto_rel:
+                            diagnosticos.append(_diagnostico(None, "note", texto_rel, [relacionada]))
+
+    if not encontrado:
         return None
-    return diagnosticos if encontrado else None
+    if not diagnosticos and hubo_resultado_descartado:
+        return None
+    return diagnosticos
 
 
 def a_hallazgos_yutani(
@@ -131,8 +180,8 @@ def a_hallazgos_yutani(
                 severidad=str(d.get("severidad") or "warning"),
                 mensaje=str(d.get("mensaje") or ""),
                 archivo=d.get("archivo"),
-                linea=linea if isinstance(linea, int) and linea >= 1 else None,
-                columna=columna if isinstance(columna, int) and columna >= 1 else None,
+                linea=linea if isinstance(linea, int) and not isinstance(linea, bool) and linea >= 1 else None,
+                columna=columna if isinstance(columna, int) and not isinstance(columna, bool) and columna >= 1 else None,
             )
         )
     return salida
