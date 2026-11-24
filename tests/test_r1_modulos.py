@@ -122,5 +122,6 @@ def test_jplag_ruta_java_usa_home_dinamico(tmp_path: Path, monkeypatch):
     fake_java.write_text("#!/bin/sh\n")
 
     monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv("USERPROFILE", str(tmp_path))
     monkeypatch.setattr(jplag.shutil, "which", lambda _cmd: None)
     assert jplag.ruta_java() == str(fake_java)
