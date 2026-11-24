@@ -38,15 +38,17 @@ testing = ["pytest>=8.0"]
 # yutani.ia: los SDK de los proveedores remotos (local y opencode no necesitan nada).
 google = ["google-genai>=2.4.0"]
 claude = ["anthropic>=1.11.0"]
+# yutani.ts_queries: motor declarativo Tree-sitter para analizadores de C.
+c = ["tree-sitter>=0.23,<0.26", "tree-sitter-c>=0.23"]
 
 [project.scripts]
 # `yutani env-check`: lo común del entorno para todas las herramientas (Ola 26).
 yutani = "yutani.entorno:main"
 
 [project.urls]
-Homepage = "https://github.com/INGCOM-UNRN-P1/yutani"
-Repository = "https://github.com/INGCOM-UNRN-P1/yutani.git"
-Issues = "https://github.com/INGCOM-UNRN-P1/yutani/issues"
+Homepage = "https://github.com/INGCOM-UNRN/yutani"
+Repository = "https://github.com/INGCOM-UNRN/yutani.git"
+Issues = "https://github.com/INGCOM-UNRN/yutani/issues"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -55,6 +57,8 @@ testpaths = ["tests"]
 dev = [
     "pytest>=8.0",
     "pyyaml>=6.0",
+    "tree-sitter>=0.23,<0.26",
+    "tree-sitter-c>=0.23",
 ]
 
 [tool.ruff.lint.flake8-bugbear]
